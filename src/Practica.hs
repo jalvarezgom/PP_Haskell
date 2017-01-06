@@ -21,13 +21,13 @@ calcular:: [Int] -> [String] -> [Int]
 calcular x [] = x
 calcular (x1:x2:xs) (y1:ys) = calcular ((operacion y1 x1 x2):xs) ys
 	
-
+tratar:: [String] -> Int
+tratar lista = undefined
 		
 
 {-calcular:: [Int] -> [String] -> [Int]
 calcular x y= undefined-}
 
-tratar:: [String] -> Int
-tratar lista = undefined
+
 
 -- calcular [3,2,4,5] ["+","+","-"] --
