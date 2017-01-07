@@ -1,13 +1,5 @@
 
 module Practica1 where
-import Data.List
-
-operacion:: String -> Int -> Int -> Int
-operacion "+" n1 n2 = n1 + n2
-operacion "-" n1 n2 = n1 - n2
-operacion "*" n1 n2 = n1 * n2
-operacion "/" n1 n2 = n1 `div` n2
-operacion "^" n1 n2 = undefined
 
 evalF:: String -> Int
 evalF "+" = 1
@@ -54,5 +46,27 @@ prueba lista = foldl (\ (postfija,opd) x -> tratar x (postfija,opd) ) ([],[]) li
 adaptar:: ([String],[String]) -> [String]
 adaptar (pstf,opd) = (head opd):pstf
 
-main:: String -> [String]
-main x = adaptar (prueba (separarString x))
+fase1:: String -> [String]
+fase1 x = adaptar (prueba (separarString x))
+
+-- FASE 2 A PARTIR DE AQUI --
+operacion:: String -> String -> String -> Int
+operacion "+" n1 n2 = (read n1::Int) + (read n2::Int)
+operacion "-" n1 n2 = (read n1::Int) - (read n2::Int)
+operacion "*" n1 n2 = (read n1::Int) * (read n2::Int)
+operacion "/" n1 n2 = (read n1::Int) `div` (read n2::Int)
+operacion "^" n1 n2 = elevado (read n1::Int) (read n2::Int) (read n1::Int)
+
+elevado:: Int -> Int -> Int -> Int
+elevado _ 1 z = z
+elevado x y z = elevado x (y-1) (z*x) 
+
+resultado:: [String] -> [String]
+resultado lista = foldr (\ valor acc -> if (evalF valor == -1) then valor:acc else calcular valor acc )[] lista
+
+calcular:: String -> [String] -> [String]
+calcular opd (x1:x2:xs) = (show (operacion opd x2 x1)):xs
+
+fase2:: String -> [String]
+fase2 x = resultado (fase1 x)
+ 
