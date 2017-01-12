@@ -1,47 +1,131 @@
 
-module Practica where
+module Practica1 where
+import System.IO  
+import System.IO.Unsafe
 
---Hace las operaciones--
-operacion:: String -> Int -> Int -> Int
-operacion "+" n1 n2 = n1 + n2
-operacion "-" n1 n2 = n1 - n2
-operacion "*" n1 n2 = n1 * n2
-operacion "/" n1 n2 = n1 `div` n2
-operacion "%" n1 n2 = n1 `mod` n2
-	
---Devuelve la prioridad del operador--
-eval:: String -> Int
-eval "+" = 1
-eval "-" = 1
-eval "*" = 2
-eval "/" = 2
-eval "%" = 2
-eval "(" = 3
-eval ")" = 4
-eval _ = 0
+-- Main --
+main = do
+	let entrada = lecturaDatos
+	let intermedio = interm entrada
+	writeFile "intermedio.txt" (unlines (concatenar intermedio))
+	let fin = final intermedio
+	let resul_final = (concatenarResultado entrada fin)
+	writeFile "final.txt" (unlines resul_final)
+	return resul_final
 
-calcular:: [Int] -> [String] -> Int
-calcular x [] = head x
-calcular (x1:x2:xs) (y1:ys) = calcular ((operacion y1 x1 x2):xs) ys
+-- Carga datos de un fichero --
+cargarDatos:: IO [String]
+cargarDatos = do 
+	handle <- readFile "entrada.txt" 
+	let expresiones = lines handle
+	return expresiones
 
+-- Adapta los datos cargados a un tipo, en este caso [String]
+lecturaDatos:: [String]
+lecturaDatos = unsafePerformIO cargarDatos
 
-	
-tratar:: String -> ([Int],[Int],[Int],[String]) -> ([Int],[Int],[Int],[String])
-tratar valor (prtn,prtop,accn,accop) 
-	| eval valor == 0 = (prtn,prtop,(read valor::Int):accn,accop) 
-	| eval valor == 1 && (length prtop)==0  = (prtn,prtop, [calcular accn accop], [valor])
-	| eval valor == 2 && (length prtop)==0  = (prtn,prtop, accn, valor:accop)
-	| eval valor == 3 = ((length accn):prtn,(length accop):prtop,accn,accop)
-	| eval valor == 4 = (tail prtn,tail prtop, accn,  accop)
-	| (eval valor == 1 || eval valor == 2) && (head prtop)==(length accop) = (prtn,prtop,accn,valor:accop)
-	-- | otherwise = (prt,accn,valor:accop)--
-	
-prueba:: [String] -> ([Int],[Int],[Int],[String])
-prueba lista = foldl (\ (prtn,prtop,accn,accop) x -> tratar x (prtn,prtop,accn,accop) ) ([],[],[],[]) lista
-		
--- 	| eval valor == 4 = (tail prtn,tail prtop, (calcular (take (length accn - head prtn) accn) (take (length accop - head prtop) accop))++(drop (length accn - head prtn) accn),  drop (length accop - head prtop) accop)--	| eval valor == 4 = (tail prtn,tail prtop, (calcular (take (length accn - head prtn) accn) (take (length accop - head prtop) accop))++(drop (length accn - head prtn) accn),  drop (length accop - head prtop) accop)
+-- Funcion dada una [String] los une entre dejando un espacio
+concatenarString:: [String] -> String
+concatenarString lista = foldr (\ valor acc -> acc  ++ valor ++ " ")"" lista
 
+-- Funcion para usar concatenarString en una lista de [String]
+concatenar:: [[String]] -> [String]
+concatenar lista = foldr (\ valor acc -> (concatenarString valor):acc) [] lista
 
+-- Funcion para concatenar el resultado final y las expresiones
+concatenarResultado:: [String] -> [[String]] -> [String]
+concatenarResultado [] [] = []
+concatenarResultado (l1:ls) ((r1:_):rs) = (l1 ++ " = " ++ r1):concatenarResultado ls rs
 
--- prueba ["2","+","3","*","2","+","1"] --
--- calcular [3,2,4,5] ["+","+","-"] --
+-- FASE 1 A PARTIR DE AQUI--
+-- Funcion para evaluar prioridades fuera
+evalF:: String -> Int
+evalF "+" = 1
+evalF "-" = 1
+evalF "*" = 2
+evalF "/" = 2
+evalF "(" = 5
+evalF ")" = 5
+evalF "^" = 3
+evalF _ = -1
+
+-- Funcion para evaluar prioridades fuera
+evalD:: String -> Int
+evalD "+" = 1
+evalD "-" = 1
+evalD "*" = 2
+evalD "/" = 2
+evalD "(" = 0
+evalD ")" = 0
+evalD "^" = 4
+evalD _ = -1
+
+-- Funcion para separar la expresion en cada operador y operando
+separarString:: String -> [String]
+separarString x = words x
+
+-- Funcion que se encarga en desapilar hasta encontrar un operador con menor prioridad que el
+desapilar:: String -> ([String],[String]) -> ([String],[String])
+desapilar valor (pstf,[])= (pstf,[valor])
+desapilar valor (pstf,opd) = if (evalF valor > evalD (head opd)) then (pstf,valor:opd) else desapilar valor ((head opd):pstf , tail opd)
+
+-- Funcion para desapilar en caso de encontrar un ")"
+desapilarprt:: ([String],[String]) -> ([String],[String])
+desapilarprt (pstf,[])= (pstf,[])
+desapilarprt (pstf,opd) = if ((head opd)=="(") then (pstf, tail opd) else desapilarprt ((head opd):pstf , tail opd)
+
+-- Funcion para tratar los valores y distinguir los distintos casos con operadores y numeros
+tratar:: String -> ([String],[String]) -> ([String],[String])
+tratar valor (pstf,opd)
+	| evalF valor == -1 = (valor:pstf,opd) -- Valor es un numero 
+	| valor == ")" = desapilarprt (pstf,opd) -- Valor es )
+	| (length opd) == 0 = (pstf,valor:opd) -- Si la lista de operadores esta vacia se inserta
+	| evalF valor > evalD (head opd) = (pstf,valor:opd) -- Valor es un operador con mayor prioridad
+	| otherwise = desapilar valor (pstf,opd)
+
+-- Funcion para tratar una funcion ya separada
+prueba:: [String] -> ([String],[String])
+prueba lista = foldl (\ (postfija,opd) x -> tratar x (postfija,opd) ) ([],[]) lista
+
+-- Funcion que adapta el resultado devolviendo una unica lista de string y añadiendo la lista de operadores a la postfija
+adaptar:: ([String],[String]) -> [String]
+adaptar (pstf,opd) = (reverse opd) ++ pstf
+
+-- Funcion que convierte una expresion a Postfija
+fase1:: String -> [String]
+fase1 x = adaptar (prueba (separarString x))
+
+-- Funcion que resuelve la FASE 1, que dado una lista de expresiones las convierte a Postfija
+interm:: [String] -> [[String]]
+interm lista = init (foldr (\x acc -> (fase1 x):acc)[[]] lista)
+
+-- FASE 2 A PARTIR DE AQUI --
+-- Funcion para hacer las distintas posible operaciones
+operacion:: String -> String -> String -> Int
+operacion "+" n1 n2 = (read n1::Int) + (read n2::Int)
+operacion "-" n1 n2 = (read n1::Int) - (read n2::Int)
+operacion "*" n1 n2 = (read n1::Int) * (read n2::Int)
+operacion "/" n1 n2 = (read n1::Int) `div` (read n2::Int)
+operacion "^" n1 n2 = elevado (read n1::Int) (read n2::Int) (read n1::Int)
+
+--Funcion que hace la operacion ^
+elevado:: Int -> Int -> Int -> Int
+elevado _ 1 z = z
+elevado x y z = elevado x (y-1) (z*x) 
+
+-- Funcion que calcula el resultado de una expresion Postfija
+resultado:: [String] -> [String]
+resultado lista = foldr (\ valor acc -> if (evalF valor == -1) then valor:acc else calcular valor acc )[] lista
+
+-- Funcion que se encarga de calcular el resultado e insertarlo en la pila de numeros
+calcular:: String -> [String] -> [String]
+calcular opd (x1:x2:xs) = (show (operacion opd x2 x1)):xs
+
+-- Funcion que aglomera las distintas funciones para obtener el resultado de una expresion
+fase2:: String -> [String]
+fase2 x = resultado (fase1 x)
+
+-- Funcion que resuelve la FASE 2, dado una lista formada por listas de cada expresin convertidas a Postfija
+final:: [[String]] -> [[String]]
+final lista = foldr (\ valor acc -> (resultado valor):acc)[] lista
+ 
